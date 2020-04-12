@@ -1,0 +1,8 @@
+---
+# exmpl_ec2:
+#   - keypair: my_keypair
+#   - instance_type: m1.small
+#   - security_group: my_securitygroup
+#   - image: my_ami_id
+#   - region: us-east-1
+#   - vpc_subnet_id: moje_vpcsubnet_id

@@ -1,0 +1,10 @@
+---
+exmpl_ec2:
+  keypair: "aws_ssh_keypair_2"
+  security_group: "default"
+  instance_type: "t2.small"
+  image: "ami-03d8261f577d71b6a"  # ami-03d8261f577d71b6a to Ubuntu 18
+  region: "eu-west-1"
+  vpc_subnet_id: "subnet-0ffdffdgsdf"
+  instance_tags:
+    mks: "{{ jaki_tag | default(mb_aws_tst_01) }}"

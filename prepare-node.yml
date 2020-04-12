@@ -1,0 +1,165 @@
+- hosts: dswarm_leaders
+  gather_facts: yes
+  become: true
+
+  tasks:
+    - name: Updates apt cache
+      shell: sudo apt-get update
+      
+      delegate_to: "{{ item }}"
+      with_items: 
+        - "{{ groups.dswarm_leaders }}"
+        - "{{ groups.dswarm_managers }}"       
+        - "{{ groups.postgres_hosts }}"
+
+    - name: Install dependencies
+      apt:
+        name: docker, docker-compose, python-pip, python3-pip, postgresql, python-dev, build-essential
+        state: present
+      
+      delegate_to: "{{ item }}"
+      with_items: 
+        - "{{ groups.dswarm_hosts }}"
+        - "{{ groups.postgres_hosts }}"
+
+    - name: Install postgres and dependencies
+      apt:
+        name: postgresql, libpq-dev
+        state: present
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups.postgres_hosts }}"
+
+    - name: Install pip - wheel, docker, jsondiff
+      pip:
+        name: wheel, docker, jsondiff
+        state: present
+      delegate_to: "{{ item }}"
+      with_items:
+        - "{{ groups.dswarm_hosts }}"
+        - "{{ groups.postgres_hosts }}"
+
+    - name: Install pip wheel, docker, jsondiff, psycopg2
+      pip:
+        name: wheel, docker, jsondiff, psycopg2
+        state: present
+      delegate_to: "{{ item }}"
+      with_items:
+        - "{{ groups.postgres_hosts }}"
+
+    - name: Install pymongo
+      pip:
+        name: pymongo
+        state: present
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups.dswarm_hosts }}"
+
+    - name: Install docker-compose
+      pip:
+        name: docker-compose
+        state: present
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups.dswarm_hosts }}"
+
+    - name: Configure docker network
+      docker_network:
+        name: examplcorp
+        scope: swarm
+        force: true
+        driver: overlay
+        attachable: yes
+        ipam_config:
+          - subnet: "10.200.200.0/24"
+            gateway: "10.200.200.1"
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups.dswarm_managers }}"
+
+    - name: Ensure group dockerized exists  # only for historiacal compability with Avra env needs
+      group:
+        name: dockerized
+        state: present
+      
+
+    - name: Create a user dockerized  # only for historiacal compability with Avra env needs
+      user:
+        name: dockerized
+        append: yes
+        groups: "dockerized"
+        comment: "Uzytkownik na potrzeby zgodnosci historycznej z Avra"
+        shell: "/bin/bash"
+      
+    
+    - name: Set /etc/dockerized file premisions
+      file:
+        path: /etc/dockerized
+        owner: dockerized
+        group: docker
+        state: directory
+        mode: 0774
+      
+
+    - name: Set /var/log/dockerized file premisions
+      file:
+        path: /var/log/dockerized
+        owner: dockerized
+        group: docker
+        state: directory
+        mode: 0774
+      
+
+    - name: Add jenkins user to docker group
+      user:
+        name: jenkins
+        groups: docker
+        append: yes
+      
+
+    - name: "Add {{ user_wykonawczy }} user to docker group"
+      user:
+        name: "{{ user_wykonawczy }}"
+        groups: docker
+        append: yes
+      
+    
+    - name: Allow localhost authentication for posgres
+      lineinfile:
+        path: /etc/postgresql/10/main/pg_hba.conf
+        regexp: '^local(.*)all(.*)postgres'
+        line: 'local   all             postgres                                trust'
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups.postgres_hosts }}"
+
+    - name: Allow AWS subnets authentication for posgres
+      lineinfile:
+        path: /etc/postgresql/10/main/pg_hba.conf
+        line: |
+          host    all             all             {{ hostvars.dswarm_manager1.ansible_host  }}/32             trust
+          host    all             all             {{ hostvars.dswarm_leader1.ansible_host  }}/32             trust
+          host    all             all             {{ hostvars.postgres1.ansible_host  }}/32             trust
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups.postgres_hosts }}"
+
+
+    - name: Setup listen on adress for postgres
+      lineinfile:
+        path: /etc/postgresql/10/main/postgresql.conf 
+        regexp: '(.*)listen_addresses =(.*)localhost(.*)'
+        line: |
+          listen_addresses = '*'
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups.postgres_hosts }}"
+
+    - name: Restart the PostgreSQL service
+      service: name=postgresql state=restarted enabled=yes
+      
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups.postgres_hosts }}"
+
+    - name: Reboot a server to force permissions change
+      
+      reboot:
+        msg: |
+                   UWAGA          
+                   Serwer zostawnie za chwile zrestartowany w ramach prac administracyjnych. 
+                   W razie pytan skontaktuj się z DevOps team.
+
+        pre_reboot_delay: 10

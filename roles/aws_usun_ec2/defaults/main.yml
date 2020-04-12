@@ -1,0 +1,9 @@
+---
+exmpl_ec2:
+  keypair: "ssh_keypair_2"
+  security_group: "mb_sg_ssh"
+  instance_type: "t2.micro"
+  image: "ami-0f65d545510d8b95d"
+  region: "eu-west-1"
+  vpc_subnet_id: "subnet-6sd34208"
+

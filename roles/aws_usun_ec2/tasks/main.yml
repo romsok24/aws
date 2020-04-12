@@ -1,0 +1,11 @@
+---
+- name: Sprawdzam wymagania wstępne dla roli AWS
+  pip:
+    name: boto
+
+- name: "Usuwanie instancji {{ instance_ids }}"
+  ec2:
+    state: "absent"
+    instance_ids: "{{ instance_ids }}"
+    region: "{{ exmpl_ec2.region }}"
+

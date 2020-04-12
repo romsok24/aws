@@ -1,0 +1,93 @@
+---
+- name: Sprawdzam wymagania wstępne dla roli AWS
+  pip:
+    name: boto, jmespath
+
+- name: "Uruchomienie instancji {{ exmpl_ec2.instance_tags }}"
+  ec2:
+    key_name: "{{ exmpl_ec2.keypair }}"
+    group: "{{ exmpl_ec2.security_group }}"
+    instance_type: "{{ exmpl_ec2.instance_type }}"
+    image: "{{ exmpl_ec2.image }}"
+    wait: true
+    region: "{{ exmpl_ec2.region }}"
+    vpc_subnet_id: "{{ exmpl_ec2.vpc_subnet_id }}"
+    # private_ip:  # to implement in future
+    assign_public_ip: no
+    instance_tags: "{{ exmpl_ec2.instance_tags }}"
+  register: exmpl_ec2_inst
+
+- name: "Czekam na połączenie do instancji {{ exmpl_ec2.instance_tags }} ..."
+  wait_for_connection:
+    delay: 90
+    timeout: 300
+
+- name: Dodanie instancji do inwentory
+  add_host:
+    ansible_host: "{{ exmpl_ec2_inst.instances[0].private_ip }}"
+    ansible_user: ubuntu  # Zmienic jesli inna dystrybucja
+    ansible_ssh_private_key_file: "{{ playbook_dir }}/aws_ssh_keypair.pem"
+    ansible_ssh_common_args: " -o StrictHostKeyChecking=no "
+    name: nowa_instancja
+
+- name: Zebranie informacji o zdubowanej instancji
+  setup:
+  delegate_to: nowa_instancja
+
+- name: "Konfiguracja - ustawienie timezone na Polskę"
+  timezone:
+    name: Europe/Warsaw
+  delegate_to: nowa_instancja
+  become: true
+
+- name: "Konfiguracja - dodanie srw. DNS z AD myB"
+  copy:
+    src: files/netlpan_custom_dns.yaml
+    dest: /etc/netplan/99-custom-dns.yaml
+  when: ansible_distribution == 'Ubuntu'
+  delegate_to: nowa_instancja
+  become: true
+
+- name: "Dodanie certyfikatu kotrolera AD do certyfikatów CA na instncji"
+  blockinfile:
+    block: "{{ lookup('file', '{{ playbook_dir }}/files/ad_cert.pem') }}"
+    dest: /etc/ssl/certs/ca-certificates.crt
+  delegate_to: nowa_instancja
+  become: true
+
+- name: Ubuntu auto sudo su
+  lineinfile:
+    path: /home/ubuntu/.profile
+    line: 'sudo su -'
+  delegate_to: nowa_instancja
+  become: true
+  
+- name: "Reboot instancji aby wdrożyć ustawienia "
+  reboot:
+  delegate_to: nowa_instancja
+  become: true
+
+- name: "Czekam na połączenie do instancji"
+  wait_for_connection:
+    delay: 15
+    timeout: 300
+  delegate_to: nowa_instancja
+
+- name: "Zmiana hostname instancji {{ exmpl_ec2.instance_tags }}"
+  command: "hostnamectl set-hostname {{ jaki_tag }}"
+  become: true
+  delegate_to: nowa_instancja
+
+- name: "Reboot instancji aby wdrożyć ustawienia "
+  reboot:
+  delegate_to: nowa_instancja
+  become: true
+
+- name: "Czekam na połączenie do instancji"
+  wait_for_connection:
+    delay: 15
+    timeout: 300
+  delegate_to: nowa_instancja
+
+- name: Report szczegółów zbudowanej instancji
+  debug: msg="{{ exmpl_ec2_inst }}"

@@ -1,0 +1,18 @@
+---
+
+# Na razie tylko dla Debiana i Ubuntu
+
+- name: Sprawdzam czy istnieje katalog do wgrania certu
+  file:
+    path: /usr/local/share/ca-certificates
+    state: directory
+
+- name: Kopiowanie certyfikatu
+  copy:
+    src: "{{ CA_cert_pem }}"
+    dest: "/usr/local/share/ca-certificates/{{ CA_cert_pem | basename }}.crt"
+  become: true
+
+- name: "Aktualizacja certyfikatów CA"
+  command: update-ca-certificates
+  become: true

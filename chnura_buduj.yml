@@ -1,0 +1,19 @@
+---
+- hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/ec2_vars.yml
+
+
+  tasks:
+    - name: Check for prereqs
+      import_role: name=ansible_prereqs
+      tags: Prereqs
+
+    - name: Zbuduj hosta EC2
+      import_role: name=aws_build_ec2
+      tags: Buduj
+
+    - name: Usun hosta EC2
+      import_role: name=aws_usun_ec2
+      tags: Usun
